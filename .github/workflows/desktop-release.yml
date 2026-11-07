@@ -52,7 +52,7 @@ jobs:
               assets = data.assets.map(a => a.name);
             } catch (error) { if (error.status !== 404) throw error; }
             const include = [];
-            if (!assets.includes('latest.yml')) include.push({os: 'windows-latest', platform: 'win'});
+            if (!assets.includes('latest.yml')) include.push({os: 'windows-2022', platform: 'win'});
             if (process.env.MACOS_RELEASE_ENABLED === 'true' && !assets.includes('latest-mac.yml')) {
               include.push({os: 'macos-15-intel', platform: 'mac'});
             }
@@ -83,6 +83,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Select Python for native module compilation
+        run: python -c "import os,sys; print('PYTHON='+sys.executable, file=open(os.environ['GITHUB_ENV'], 'a'))"
       # Native serialport is rebuilt for Electron by electron-builder, not host Node.
       - run: npm ci --ignore-scripts
       - run: npm run test:updates
