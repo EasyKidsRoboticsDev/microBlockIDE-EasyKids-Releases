@@ -57,7 +57,11 @@ jobs:
               include.push({os: 'macos-15-intel', platform: 'mac'});
             }
             if (process.env.MACOS_RELEASE_ENABLED !== 'true') {
-              core.warning('macOS releases disabled: configure Apple signing secrets and MACOS_RELEASE_ENABLED=true');
+              for (const [arch, os] of [['x64', 'macos-15-intel'], ['arm64', 'macos-15']]) {
+                if (!assets.includes(`microBlock-IDE-EasyKids-${pkg.version}-${arch}-mac.dmg`)) {
+                  include.push({os, platform: 'mac-unsigned', arch});
+                }
+              }
             }
             core.setOutput('matrix', JSON.stringify({include}));
             core.setOutput('needed', include.length > 0 ? 'true' : 'false');
@@ -116,9 +120,19 @@ jobs:
             if [ -z "${!name}" ]; then echo "::error::Missing secret: $name"; exit 1; fi
           done
           npm run dist:mac -- --x64 --arm64 --publish never --config.forceCodeSigning=true --config.mac.notarize.teamId="$APPLE_TEAM_ID"
+      - name: Build unsigned macOS DMG for manual installation
+        if: matrix.platform == 'mac-unsigned'
+        shell: bash
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          TARGET_ARCH: ${{ matrix.arch }}
+        run: |
+          npm run dist:mac -- --mac dmg --"$TARGET_ARCH" --publish never --config.mac.identity=null --config.mac.notarize=false --config.mac.hardenedRuntime=false --config.extraMetadata.desktopUpdateMode=manual
+          # Unsigned DMGs are manual downloads, never an automatic update feed.
+          rm -f dist/latest-mac*.yml
       - uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.platform }}
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch || 'all' }}
           if-no-files-found: error
           path: |
             dist/*.exe
@@ -146,13 +160,14 @@ jobs:
           set -euo pipefail
           tag="v$VERSION"
           if ! gh release view "$tag" >/dev/null 2>&1; then
-            printf 'Source: https://github.com/EasyKidsRoboticsDev/microBlockIDE-EasyKids-Edition-Online/commit/%s\n\nWindows: install Setup.exe. macOS: install the DMG into Applications. Updates download automatically; confirm before restarting.\n' "$SOURCE_SHA" > notes.txt
+            printf 'Source: https://github.com/EasyKidsRoboticsDev/microBlockIDE-EasyKids-Edition-Online/commit/%s\n\nWindows: install Setup.exe; updates download automatically. macOS: install the matching Intel or Apple Silicon DMG into Applications. Unsigned macOS builds require manual updates; automatic macOS updates require Apple signing.\n' "$SOURCE_SHA" > notes.txt
             gh release create "$tag" --draft --title "microBlock IDE EasyKids $VERSION" --notes-file notes.txt
           fi
           shopt -s nullglob
           binaries=(release/*.exe release/*.dmg release/*.zip release/*.blockmap)
           manifests=(release/latest*.yml)
-          [ ${#binaries[@]} -gt 0 ] && [ ${#manifests[@]} -gt 0 ]
+          [ ${#binaries[@]} -gt 0 ]
           gh release upload "$tag" "${binaries[@]}" --clobber
-          gh release upload "$tag" "${manifests[@]}" --clobber
-          gh release edit "$tag" --draft=false --latest
+          if [ ${#manifests[@]} -gt 0 ]; then gh release upload "$tag" "${manifests[@]}" --clobber; fi
+          printf 'Windows: install Setup.exe; updates download automatically. macOS: install the matching Intel or Apple Silicon DMG into Applications. Unsigned macOS builds require manual updates; automatic macOS updates require Apple signing.\n' > notes.txt
+          gh release edit "$tag" --draft=false --latest --notes-file notes.txt
