@@ -19,16 +19,16 @@ jobs:
     steps:
       - name: Require read access to the private source repository
         env:
-          SOURCE_READ_TOKEN: ${{ secrets.SOURCE_READ_TOKEN }}
+          SOURCE_READ_KEY: ${{ secrets.SOURCE_READ_KEY }}
         run: |
-          if [ -z "$SOURCE_READ_TOKEN" ]; then
-            echo "::error::Add SOURCE_READ_TOKEN with Contents read-only access to the private source repository. See DESKTOP-RELEASES.md."
+          if [ -z "$SOURCE_READ_KEY" ]; then
+            echo "::error::Add SOURCE_READ_KEY with a read-only SSH deploy key for the private source repository. See DESKTOP-RELEASES.md."
             exit 1
           fi
       - uses: actions/checkout@v4
         with:
           repository: EasyKidsRoboticsDev/microBlockIDE-EasyKids-Edition-Online
-          token: ${{ secrets.SOURCE_READ_TOKEN }}
+          ssh-key: ${{ secrets.SOURCE_READ_KEY }}
           ref: main
           persist-credentials: false
       - id: source
@@ -73,7 +73,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: EasyKidsRoboticsDev/microBlockIDE-EasyKids-Edition-Online
-          token: ${{ secrets.SOURCE_READ_TOKEN }}
+          ssh-key: ${{ secrets.SOURCE_READ_KEY }}
           ref: ${{ needs.plan.outputs.sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
