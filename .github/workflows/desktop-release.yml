@@ -90,7 +90,15 @@ jobs:
       - run: npm run test:updates
       - name: Build Windows NSIS update
         if: matrix.platform == 'win'
-        run: npm run dist:win -- --publish never
+        shell: pwsh
+        run: |
+          # Empty optional secrets must be absent: builder treats an empty link as a path.
+          foreach ($name in @('CSC_LINK', 'CSC_KEY_PASSWORD')) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              Remove-Item "Env:$name" -ErrorAction SilentlyContinue
+            }
+          }
+          npm run dist:win -- --publish never
         env:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
